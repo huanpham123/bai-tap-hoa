@@ -17,7 +17,8 @@ logger = logging.getLogger("keepalive_app")
 
 def ping_stt_server():
     """
-    Gửi GET đến STT_PING_URL. Nếu thành công (200), log OK; ngược lại log lỗi.
+    Gửi GET đến STT_PING_URL. Nếu thành công (HTTP 200), log OK;
+    nếu không, log cảnh báo hoặc lỗi tương ứng.
     """
     try:
         logger.info(f"▶ Gửi ping tới STT server: {STT_PING_URL}")
@@ -27,7 +28,7 @@ def ping_stt_server():
         if status == 200:
             logger.info("✅ STT server đang hoạt động (HTTP 200).")
         else:
-            logger.warning(f"⚠️ Ping trả về HTTP {status}. Response: {resp.text[:100]}")
+            logger.warning(f"⚠️ Ping trả về HTTP {status}. Response (cắt): {resp.text[:100]}")
     except Exception as e:
         logger.error(f"❌ Lỗi khi ping STT server: {e}")
 
@@ -35,7 +36,8 @@ def ping_stt_server():
 @app.route("/")
 def index():
     """
-    Trang HTML hiển thị trạng thái định kỳ (tuỳ chọn). Nếu không cần, có thể bỏ.
+    Trả về trang HTML (index.html). Trang này chỉ để kiểm tra rằng 
+    Flask instance đang chạy, không bắt buộc phải mở để cron hoạt động.
     """
     return render_template("bt.html")
 
@@ -43,8 +45,8 @@ def index():
 @app.route("/keepalive", methods=["GET"])
 def keepalive():
     """
-    Khi được gọi thủ công (hoặc Cron), hàm này cũng sẽ thực hiện ping ngay lập tức
-    và trả JSON phản hồi tương ứng.
+    Khi được gọi (qua Cron hoặc thủ công), hàm này cũng gửi ping ngay lập tức
+    đến STT_PING_URL và trả JSON kết quả để dễ debug.
     """
     try:
         logger.info(f"▶ (Manual) Ping STT server: {STT_PING_URL}")
@@ -54,7 +56,11 @@ def keepalive():
         if status == 200:
             return jsonify({"ok": True, "status_code": 200, "message": "STT server is awake"}), 200
         else:
-            return jsonify({"ok": False, "status_code": status, "message": f"Ping returned HTTP {status}"}), 502
+            return jsonify({
+                "ok": False,
+                "status_code": status,
+                "message": f"Ping returned HTTP {status}"
+            }), 502
 
     except Exception as e:
         logger.error(f"❌ (Manual) Lỗi khi ping STT server: {e}")
@@ -66,14 +72,14 @@ def start_scheduler():
     Khởi BackgroundScheduler để tự động gọi ping_stt_server() mỗi 2 phút.
     """
     scheduler = BackgroundScheduler(daemon=True)
-    # Chạy ngay lần đầu, rồi mỗi PING_INTERVAL_MINUTES
+    # next_run_time=None để chạy lần đầu ngay lập tức khi container khởi
     scheduler.add_job(ping_stt_server, "interval", minutes=PING_INTERVAL_MINUTES, next_run_time=None)
     scheduler.start()
     logger.info(f"✅ Scheduler đã khởi, ping mỗi {PING_INTERVAL_MINUTES} phút.")
 
 
 if __name__ == "__main__":
-    # Khởi scheduler trước khi Flask chạy
+    # Trước hết khởi scheduler
     logger.info("Khởi tạo scheduler để tự động ping STT server...")
     start_scheduler()
 
