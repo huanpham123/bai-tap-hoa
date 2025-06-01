@@ -20,7 +20,7 @@ def index():
     Trả về trang HTML (bt.html) nếu có ai mở trình duyệt.
     Trang này chỉ để hiển thị trạng thái ping lần cuối (tuỳ chọn).
     """
-    return render_template("index.html")
+    return render_template("bt.html")
 
 
 @app.route("/keepalive", methods=["GET"])
